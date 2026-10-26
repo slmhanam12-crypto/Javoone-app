@@ -1,7 +1,7 @@
 /* جوونه | سرویس‌ورکر
    کار آن: بعد از اولین باز شدن اپ، همه‌چیز را روی گوشی نگه می‌دارد تا بدون اینترنت هم کار کند.
    اگر فایل‌های اپ را عوض کردی، عدد VERSION را یکی بالا ببر تا نسخه‌ی قدیمی پاک شود. */
-const VERSION = 'jooneh-v2';
+const VERSION = 'jooneh-v3';
 const CORE = [
   './', 'index.html', 'style.css', 'app.js', 'manifest.json',
   'data/app.json', 'data/plants.json', 'data/symptoms.json', 'data/finder.json',
@@ -13,15 +13,24 @@ const CORE = [
 ];
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(VERSION).then((c) => c.addAll(CORE)).then(() => self.skipWaiting()));
-});
+  event.waitUntil((async () => {
+    const cache = await caches.open(VERSION);
 
-self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== VERSION).map((k) => caches.delete(k))))
-      .then(() => self.clients.claim())
-  );
+    await Promise.all(CORE.map(async (path) => {
+      try {
+        const url = new URL(path, self.registration.scope);
+        const response = await fetch(url);
+
+        if (response.ok) {
+          await cache.put(url, response);
+        }
+      } catch (error) {
+        console.warn('Cache skipped:', path);
+      }
+    }));
+
+    await self.skipWaiting();
+  })());
 });
 
 /* اول از حافظه‌ی گوشی می‌خواند (سریع و آفلاین) و همزمان نسخه‌ی تازه را در پس‌زمینه می‌گیرد. */
